@@ -1,6 +1,6 @@
 ---
 name: buildloop-build
-description: Execute an approved build design end to end — read-back gate, branch builders in isolated git worktrees, an independent prover that never saw the build reasoning, an integrator that owns the seams, and an adopt station that turns a finished build into a used one. Resumable across sessions via a run-state file, and every build appends a line to the ledger so unadopted work stays visible instead of going dark. Station ③, the counterpart to /buildloop-plan. Use when the user says "/buildloop-build", "build this doc", "run the build team", "resume the build", or pastes an approved build design into a fresh chat.
+description: Execute an approved build design end to end — read-back gate, branch builders in isolated git worktrees, an independent prover that never saw the build reasoning, an integrator that owns the seams, an audit station that runs /proofcheck on the build's own report, and an adopt station that turns a finished build into a used one. Resumable across sessions via a run-state file, and every build appends a line to the ledger so unadopted work stays visible instead of going dark. Station ③, the counterpart to /buildloop-plan. Use when the user says "/buildloop-build", "build this doc", "run the build team", "resume the build", or pastes an approved build design into a fresh chat.
 ---
 
 # /buildloop-build — the build team, one command
@@ -24,10 +24,14 @@ Station ③. `/buildloop-plan` produced the doc; this executes it.
         │
    ❻ LIVE RUN ─ the one real run the doc names
         │
-   ❼ REPORT ──▶ station ④ /proofcheck, in a chat that never saw this one
-        │        …and one line appended to <docs_dir>/LEDGER.md
+   ❼ REPORT ──── what happened, including the misses.
+        │        One line appended to <docs_dir>/LEDGER.md
         │
-   ❽ ADOPT ──── switch it on, use it N times as a stranger, record it.
+   ❽ AUDIT ───── a fresh agent runs /proofcheck ON YOUR REPORT.
+        │        It never saw this session. It may not be edited.
+        │        NOT PROVEN here BLOCKS adoption.
+        │
+   ❾ ADOPT ──── switch it on, use it N times as a stranger, record it.
                 Most builds STAGE this and leave the ledger row "NO — owed".
                 A build that is never adopted is a build that did not happen.
 ```
@@ -100,14 +104,22 @@ machines sleep. Without state on disk, a crash at station ❺ throws away three
 agents and forty minutes, and the restart quietly re-runs work that was already
 correct.
 
+**`<doc-slug>` is the build doc's own filename with the extension removed** —
+nothing else, no re-derivation, no abbreviating. A doc at
+`build-docs/BUILD-2026-08-15-graph-contract.md` has the run-state file
+`build-docs/runs/RUN-BUILD-2026-08-15-graph-contract.md`. It must be computable
+by a session that has only the doc path, or resume silently misses the file and
+restarts a build that was half finished.
+
 ```bash
-ls <docs_dir>/runs/RUN-<doc-slug>.md 2>/dev/null
+DOC_SLUG=$(basename "<doc path>" .md)
+ls <docs_dir>/runs/RUN-$DOC_SLUG.md 2>/dev/null
 ```
 
 | Found | Do |
 |---|---|
 | nothing | fresh build — create the file at the end of Step 1 |
-| a file whose last station is ❼ or ❽ | **this build is finished.** Do not rebuild it. Say what it says and stop |
+| a file whose last station is ❽ or ❾ | **this build is finished.** Do not rebuild it. Say what it says and stop |
 | a file mid-flight | **resume from the next station**, do not restart |
 
 **Before resuming, re-verify the world still matches the file** — the worktree
@@ -274,11 +286,13 @@ Flags:         <name> — OFF in file / OFF in process (verified separately)
 Seams:         <what the integrator found>
 Branch:        <branch> @ <sha> — NOT pushed, NOT merged to trunk
 Human's calls: <one-way doors reached, conflicts the doc didn't decide>
-ADOPTION:      OWED — <the exact command that switches it on>
+ADOPTED:       NO — owed. <the exact command that switches it on>
 MISSES:        <what didn't work — with the output>
-
-Next: /proofcheck this report in a chat that never saw this one.
 ```
+
+Use the word **ADOPTED** here and in the ledger — one state, one name. A report
+that says `ADOPTION:` and a ledger that says `ADOPTED` are two columns nobody can
+grep together.
 
 **Report faithfully, including the misses.** Say "it didn't work" with the output.
 No false victories, no bare "done," no bare "proven."
@@ -289,20 +303,65 @@ A build that exists only in a chat transcript is a build nobody can find next
 month. Create the file if it does not exist, with this header:
 
 ```
-| date | doc | branch@sha | reqs | proof | live run | ADOPTED |
-|---|---|---|---|---|---|---|
-| 2026-08-15 | graph-contract | bl/graph-contract@27c373f | 14/15 | 7L 8H 0U | ran | **NO — owed** |
+| date | doc | branch@sha | reqs | proof | live run | audit | ADOPTED |
+|---|---|---|---|---|---|---|---|
+| 2026-08-15 | graph-contract | bl/graph-contract@27c373f | 15/15 | 7L 8H 0U | ran | clean | **NO — owed** |
 ```
 
 `ADOPTED` starts **NO — owed** for every build that ships behind a flag, and it
-stays that way until station ⑧ changes it. **That column is the point of the
+stays that way until station ❾ changes it. **That column is the point of the
 file.** A ledger where most rows say `NO` is not an embarrassment — it is the
 first honest measurement of the gap between building and shipping, and you cannot
 close a gap you are not counting.
 
 ---
 
-## ❽ Step 8 — ADOPT. The station that makes the build real.
+## ❽ Step 8 — AUDIT the report. The build does not end until this runs.
+
+Station ❹ asked *"did the requirements land?"* This asks a different question:
+**"is the report you just wrote honest?"** They catch different things. On the
+build this loop was written from, `bl-prover` and `bl-integrator` both passed the
+work — and an audit of the *report* then found three overstatements that the
+builder, the prover, the integrator and the orchestrator had all missed.
+
+**Spawn a fresh agent and have it invoke the `proofcheck` skill.** Hand it exactly
+three things:
+
+- the **build doc**
+- the **build report** from step ❼
+- **where the code is** — branch, sha, worktree path
+
+Hand it **nothing else**. Not the builders' reports, not the prover's reasoning,
+not your own. It re-derives from the artifacts or the audit is theatre. Give it
+the environment facts it needs to run things correctly (which interpreter, which
+tree, what is not installed) — those are facts, not conclusions.
+
+Tell it plainly: **do not manufacture findings; a clean result is a valid result.**
+An auditor that always finds something is one you learn to ignore.
+
+### What you do with what it says
+
+| Verdict | Do |
+|---|---|
+| clean | record it, proceed to ❾ |
+| the report **overstates** | **correct the report**, then re-audit — once |
+| NOT PROVEN | the report is wrong. Fix it. **Adoption is blocked until this is resolved.** |
+
+**Cap: 2 audit rounds.** Correct once, re-audit once. If you and the auditor still
+disagree at round 2, **publish both positions in the report** and let the human
+decide. Do not open a third round, and do not keep re-auditing until you get the
+answer you want — that is shopping for a verdict.
+
+**You may not edit its findings.** Publish them verbatim or attributed. If you
+think one is wrong, say so *next to it* with your evidence; do not delete it. The
+rule against relaying a subagent's claim as verified cuts both ways — you may not
+launder a finding in, and you may not quietly drop one out.
+
+Record the verdict in the report and in the ledger row.
+
+---
+
+## ❾ Step 9 — ADOPT. The station that makes the build real.
 
 Requirements landing is not the finish line. A flag that ships OFF and is never
 turned on is a build that did not happen, and it is the single most common way
@@ -318,7 +377,7 @@ this loop's output dies.
 
 **Every step of that is a one-way door, so none of it is yours to do alone.**
 Flipping a capability flag, deploying, merging to a shared trunk, restarting a
-service — the doc's own SCOPE FENCE says these stop for the human. So station ⑧
+service — the doc's own SCOPE FENCE says these stop for the human. So station ❾
 runs in exactly one of two modes:
 
 | Mode | When | What you do |
@@ -356,7 +415,7 @@ one. Write it up and stop. Do not reopen a closed build from its adoption run.
   once survived four agents and a full audit precisely because each was inherited
   and none was re-checked.
 - **Never adopt on your own authority.** Flipping a flag, deploying, merging to a
-  shared trunk or restarting a service is station ⑧ and it belongs to the human.
+  shared trunk or restarting a service is station ❾ and it belongs to the human.
   Stage it and hand over the one command.
 - **Never skip the ledger line**, even when the news is bad. Especially then — an
   unadopted build that nobody wrote down is how 29 builds went dark.
@@ -389,5 +448,6 @@ one. Write it up and stop. Do not reopen a closed build from its adoption run.
 
 - `/buildloop-plan` — stations ① ② ②ᵇ, produces the doc this consumes
 - `/buildplan` — the document format, including the read-back gate
-- `/proofcheck` — station ④, run it on this report in a fresh chat
+- `/proofcheck` — station ❽ runs it automatically on your report; run it
+  yourself too, on anything else that claims to be done
 - `doctrine/BUILDING-DOCTRINE.md` — the law all three agents are held to

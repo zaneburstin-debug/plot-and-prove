@@ -90,13 +90,26 @@ catches it.
                nobody can see live.
 ❻ LIVE RUN     run the real thing once, for real. Not a test rig.
 ❼ REPORT       including what failed. One line appended to the ledger.
-❽ ADOPT        switch it on, use it as a stranger would, record it.
+❽ AUDIT        a fresh agent runs /proofcheck ON THIS REPORT. It never saw
+               the build. Its findings may not be edited. NOT PROVEN here
+               blocks adoption.
+❾ ADOPT        switch it on, use it as a stranger would, record it.
 ```
 
 Every station writes its state to disk, so a build that spans days can be
 resumed by someone who wasn't there.
 
+**Station ❽ is the one people are surprised by.** Station ❹ already asked *"did
+the requirements land?"* — ❽ asks a different question: *"is the report you just
+wrote honest?"* On the build this loop was written from, the prover and the
+integrator both passed the work, and an audit of the **report** then found three
+overstatements that the builder, the prover, the integrator and the orchestrator
+had all missed.
+
 ### Building 3 — quality control · `/proofcheck`
+
+The build runs this automatically at ❽. You also run it by hand on anything else
+that claims to be done — another agent's work, a colleague's PR, your own.
 
 ```
 0  read this project's own rulebook. What counts as "really tested" HERE?

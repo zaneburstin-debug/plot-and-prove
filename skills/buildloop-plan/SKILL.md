@@ -255,6 +255,8 @@ Watch for:
   it writes files before restating    → the gate didn't run. Stop it.
 
 Proof kind promised: HARNESS-PROVEN | LIVE-PROVEN
+The build ends with station ❽ — a fresh agent audits its own report before
+anything can be adopted.
 The one live run that closes it: <the run>
 
 Still yours to decide: <anything the gate flagged as needing a human call>
@@ -281,5 +283,6 @@ Still yours to decide: <anything the gate flagged as needing a human call>
 - `/buildloop-init` — writes the `.buildloop.md` this reads
 - `/buildplan` — the document format this team produces
 - `/buildloop-build` — station ③, executes this doc in a fresh chat
-- `/proofcheck` — station ④, run it on what comes back from the build chat
+- `/proofcheck` — the build's station ❽ runs it automatically on its own report;
+  run it yourself on anything else that claims to be done
 - `doctrine/BUILDING-DOCTRINE.md` — the law all five agents are held to
